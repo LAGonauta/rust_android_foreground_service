@@ -1,0 +1,33 @@
+import { VerticalBox, Button } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in property <bool> is-android;
+    property <int> count: 0;
+
+    callback start-foreground-service;
+    callback stop-foreground-service;
+    VerticalBox {
+        alignment: center;
+
+        Text {
+            text: "Hello world! Count: " + count;
+        }
+
+        Button {
+            text: "Add!";
+            clicked => {
+                count = count + 1;
+            }
+        }
+
+        if is-android: Button {
+            text: "Start foreground service";
+            clicked => start-foreground-service();
+        }
+
+        if is-android: Button {
+            text: "Stop foreground service";
+            clicked => stop-foreground-service();
+        }
+    }
+}

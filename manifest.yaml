@@ -1,0 +1,23 @@
+android:
+  icon: icon.png
+  gradle: true
+  dependencies:
+    - androidx.core:core-ktx:1.9.0
+    - androidx.media:media:1.6.0
+  manifest:
+    package: "com.test.foregroundservice"
+    sdk:
+      min_sdk_version: 26
+      target_sdk_version: 33
+    uses_permission:
+      - name: "android.permission.FOREGROUND_SERVICE"
+      - name: "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      - name: "android.permission.POST_NOTIFICATIONS"
+    application:
+      has_code: true
+      label: ForegroundTester
+      services:
+        - label: Rust Service
+          name: .RustService
+          foreground_service_type: mediaPlayback
+          exported: true

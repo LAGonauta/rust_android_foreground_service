@@ -1,0 +1,25 @@
+[package]
+name = "template"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+anyhow = "1.0.68"
+log = "0.4.17"
+slint = { version = "1.13.1", features = ["log", "raw-window-handle-06", "backend-android-activity-06"] }
+i-slint-core = { version = "1.13.1" }
+jni-min-helper = "0.3.2"
+flume = "0.11.1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15.1"
+jni = "0.21"
+
+[build-dependencies]
+anyhow = "1.0"
+slint-build = "1.13.1"
+winresource = "0.1"
