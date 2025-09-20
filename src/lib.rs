@@ -10,7 +10,7 @@ slint::include_modules!();
 fn android_main(app: slint::android::AndroidApp) {
     android_logger::init_once(
         android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Trace)
+            .with_max_level(log::LevelFilter::Debug)
             .with_tag("template"),
     );
 
@@ -35,6 +35,8 @@ fn android_main(app: slint::android::AndroidApp) {
             info!("Service stopped");
         }
     });
+    
+    info!("Starting app on PID {}", std::process::id());
 
     ui.run().unwrap();
 }

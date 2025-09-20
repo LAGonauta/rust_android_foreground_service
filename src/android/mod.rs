@@ -2,10 +2,10 @@ use jni::objects::{JClass, JObject, JString, JValue, JValueGen};
 use jni::{JNIEnv, JavaVM};
 use jni_min_helper::JniClassLoader;
 use log::info;
+use rand::Rng;
 use std::sync::{LazyLock, Mutex};
 
-const NOTIFICATION_ID: i32 = 1337;
-const CHANNEL_ID: &str = "my_channel_id";
+const CHANNEL_ID: &str = "media-channel";
 
 static SERVICE_MUTEX: LazyLock<Mutex<(bool, flume::Sender<()>, flume::Receiver<()>)>> =
     LazyLock::new(|| {
@@ -13,7 +13,7 @@ static SERVICE_MUTEX: LazyLock<Mutex<(bool, flume::Sender<()>, flume::Receiver<(
         Mutex::new((false, s, r))
     });
 
-/// JNI entry point called by the Java service's onCreate method.
+// JNI entry point called by the Java service's onCreate method.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLogic(
@@ -21,6 +21,7 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
     _class: JClass,
     service: JObject,
 ) {
+    info!("Starting foreground service on PID {}", std::process::id());
     let mut data = (*SERVICE_MUTEX).lock().expect("expected valid lock");
     if data.0 {
         return;
@@ -30,7 +31,6 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
     let r = data.2.clone();
     drop(data);
 
-    // First, create the notification channel. This is safe to call multiple times.
     if let Err(e) = create_notification_channel(&mut env, &service) {
         log::error!(
             "Failed to create notification channel from service: {:?}",
@@ -39,7 +39,6 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
         return;
     }
 
-    // Next, build the notification object.
     let notification = match build_media_notification(&mut env, &service) {
         Ok(n) => n,
         Err(e) => {
@@ -48,13 +47,11 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
         }
     };
 
-    // Finally, call service.startForeground() to make this a foreground service.
-    // This is the key step!
     let result = env.call_method(
         &service,
         "startForeground",
         "(ILandroid/app/Notification;)V",
-        &[JValue::Int(NOTIFICATION_ID), JValue::Object(&notification)],
+        &[JValue::Int(rand::rng().random()), JValue::Object(&notification)],
     );
 
     match result {
@@ -75,7 +72,7 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
                 data.0 = false;
 
                 env.call_method(
-                    &service_ref,
+                    service_ref,
                     "stopForeground",
                     "(Z)V",
                     &[JValue::Bool(true.into())],
@@ -85,19 +82,23 @@ pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_startRustLo
     }
 }
 
-/// JNI entry point for cleanup.
+// JNI entry point for cleanup.
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern "C" fn Java_com_test_foregroundservice_RustService_stopRustLogic(
     mut _env: JNIEnv,
     _class: JClass,
 ) {
-    log::info!("Rust logic cleanup initiated.");
+    log::info!("Rust logic cleanup initiated on PID {}", std::process::id());
 
     let data = (*SERVICE_MUTEX).lock().expect("expected valid lock");
-    if data.0 {
+    if !data.0 {
+        log::info!("No service to stop.");
         return;
     }
+
+    log::info!("Sending message to stop service.");
+
     // Notify the thread created in startRustLogic to stop
     _ = data.1.send(());
 }
@@ -111,7 +112,7 @@ pub fn create_notification_channel(env: &mut JNIEnv, context: &JObject) -> jni::
     let sdk_int: i32 = env.get_static_field(version_class, "SDK_INT", "I")?.i()?;
 
     if sdk_int >= 26 {
-        let channel_id: JString = env.new_string("my_channel_id")?;
+        let channel_id: JString = env.new_string(CHANNEL_ID)?;
         let channel_name: JString = env.new_string("Multimedia playback")?;
         let manager_class = env.find_class(NOTIFICATION_MANAGER)?;
         let importance: i32 = env
@@ -198,7 +199,6 @@ fn build_media_notification<'a>(
 
     info!("Icon ID is {}", small_icon_id);
 
-    // --- Create and configure NotificationCompat.Builder ---
     let builder_class = env.find_class("androidx/core/app/NotificationCompat$Builder")?;
     let channel_id_jstr = env.new_string(CHANNEL_ID)?;
     let mut builder = env.new_object(
